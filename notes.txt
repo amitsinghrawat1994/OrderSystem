@@ -1,0 +1,67 @@
+OrderSystem/
+├── OrderSystem.sln
+├── src/
+│   ├── OrderSystem.Shared/
+│   │   ├── OrderSystem.Shared.csproj
+│   │   └── Contracts/
+│   │       └── OrderCreatedEvent.cs
+│   ├── OrderSystem.Api/
+│   │   ├── OrderSystem.Api.csproj
+│   │   ├── Program.cs
+│   │   ├── appsettings.json
+│   │   ├── Features/
+│   │   │   └── Orders/
+│   │   │       ├── CreateOrderCommand.cs
+│   │   │       └── CreateOrderValidator.cs
+│   │   ├── Infrastructure/
+│   │   │   └── ServiceBus/
+│   │   │       ├── IMessageBus.cs
+│   │   │       └── AzureServiceBusPublisher.cs
+│   │   └── Behaviors/
+│   │       └── ValidationBehavior.cs
+│   └── OrderSystem.Worker/
+│       ├── OrderSystem.Worker.csproj
+│       ├── Program.cs
+│       ├── Worker.cs
+│       └── Infrastructure/
+│           └── OrderCreatedConsumer.cs
+
+# 1. Create Solution and Projects (NET 9)
+dotnet new sln -n OrderSystem
+mkdir src
+cd src
+
+dotnet new classlib -n OrderSystem.Shared
+dotnet new webapi -n OrderSystem.Api
+dotnet new worker -n OrderSystem.Worker
+
+# 2. Add projects to solution
+cd ..
+dotnet sln add src/OrderSystem.Shared/OrderSystem.Shared.csproj
+dotnet sln add src/OrderSystem.Api/OrderSystem.Api.csproj
+dotnet sln add src/OrderSystem.Worker/OrderSystem.Worker.csproj
+
+# 3. Add Project References
+dotnet add src/OrderSystem.Api/OrderSystem.Api.csproj reference src/OrderSystem.Shared/OrderSystem.Shared.csproj
+dotnet add src/OrderSystem.Worker/OrderSystem.Worker.csproj reference src/OrderSystem.Shared/OrderSystem.Shared.csproj
+
+# 4. Install NuGet Packages for API
+cd src/OrderSystem.Api
+dotnet add package Azure.Messaging.ServiceBus
+dotnet add package MediatR
+dotnet add package FluentValidation
+dotnet add package FluentValidation.DependencyInjectionExtensions
+dotnet add package Serilog.AspNetCore
+dotnet add package Serilog.Sinks.Console
+
+# 5. Install NuGet Packages for Worker
+cd ../OrderSystem.Worker
+dotnet add package Azure.Messaging.ServiceBus
+dotnet add package Serilog.Extensions.Hosting
+dotnet add package Serilog.Sinks.Console
+dotnet add package Newtonsoft.Json 
+
+# Return to root
+cd ../..
+
+
