@@ -27,6 +27,20 @@ public class AzureServiceBusPublisher : IMessageBus, IAsyncDisposable
             }
         };
 
+        // DETECT LOCAL EMULATOR: 
+        // If the connection string contains "UseDevelopmentEmulator=true", we assume local usage.
+        if (connectionString.Contains("UseDevelopmentEmulator=true"))
+        {
+            // WARNING: Only use this for local development!
+            options.TransportType = ServiceBusTransportType.AmqpTcp;
+            //options.AmqpWebSocketsEventSource = null; // Sometimes required for older SDKs
+
+            // Currently, the .NET SDK doesn't expose a simple "IgnoreCertificate" property 
+            // directly on ServiceBusClientOptions for AMQP.
+            // The "UseDevelopmentEmulator=true" flag in the connection string 
+            // handles most of this logic in the latest Azure.Messaging.ServiceBus package (v7.17+).
+        }
+
         _client = new ServiceBusClient(connectionString, options);
     }
 

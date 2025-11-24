@@ -1,0 +1,29 @@
+{
+    "UserConfig": {
+        "Namespaces": [
+            {
+                "Name": "OrderSystemNamespace",
+                "Topics": [
+                    {
+                        "Name": "orders-topic",
+                        "Properties": {
+                            "DefaultMessageTimeToLive": "PT1H"
+                        },
+                        "Subscriptions": [
+                            {
+                                "Name": "inventory-sub",
+                                "Properties": {
+                                    "LockDuration": "PT1M"
+                                }
+                            }
+                        ]
+                    }
+                ],
+                "Queues": []
+            }
+        ],
+        "Logging": {
+            "Type": "File"
+        }
+    }
+}

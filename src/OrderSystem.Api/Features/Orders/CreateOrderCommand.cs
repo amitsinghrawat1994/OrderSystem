@@ -1,0 +1,42 @@
+using MediatR;
+using OrderSystem.Api.Infrastructure.ServiceBus;
+using OrderSystem.Shared.Contracts;
+
+namespace OrderSystem.Api.Features.Orders;
+
+// Command Record
+public record CreateOrderCommand(string CustomerId, decimal TotalAmount, List<string> Items) : IRequest<Guid>;
+
+// Handler
+public class CreateOrderHandler : IRequestHandler<CreateOrderCommand, Guid>
+{
+    private readonly IMessageBus _messageBus;
+    private readonly ILogger<CreateOrderHandler> _logger;
+    private const string TopicName = "orders-topic"; // Ensure this exists in Azure
+
+    public CreateOrderHandler(IMessageBus messageBus, ILogger<CreateOrderHandler> logger)
+    {
+        _messageBus = messageBus;
+        _logger = logger;
+    }
+
+    public async Task<Guid> Handle(CreateOrderCommand request, CancellationToken cancellationToken)
+    {
+        // 1. Simulate Database Logic
+        var orderId = Guid.NewGuid();
+        _logger.LogInformation("Order {OrderId} created in database for Customer {CustomerId}", orderId, request.CustomerId);
+
+        // 2. Map to Event
+        var integrationEvent = new OrderCreatedEvent(
+            OrderId: orderId,
+            CustomerId: request.CustomerId,
+            TotalAmount: request.TotalAmount,
+            CreatedAt: DateTime.UtcNow
+        );
+
+        // 3. Publish to Azure Service Bus
+        await _messageBus.PublishAsync(integrationEvent, TopicName, cancellationToken);
+
+        return orderId;
+    }
+}

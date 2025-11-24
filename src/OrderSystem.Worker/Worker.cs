@@ -1,16 +1,30 @@
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Hosting;
+using OrderSystem.Worker.Infrastructure;
+
 namespace OrderSystem.Worker;
 
-public class Worker(ILogger<Worker> logger) : BackgroundService
+public class Worker : BackgroundService
 {
+    private readonly OrderCreatedConsumer _consumer;
+
+    public Worker(OrderCreatedConsumer consumer)
+    {
+        _consumer = consumer;
+    }
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        // Start the Service Bus processor
+        await _consumer.StartProcessingAsync();
+
+        // Keep the worker alive until cancelled
         while (!stoppingToken.IsCancellationRequested)
         {
-            if (logger.IsEnabled(LogLevel.Information))
-            {
-                logger.LogInformation("Worker running at: {time}", DateTimeOffset.Now);
-            }
             await Task.Delay(1000, stoppingToken);
         }
+
+        await _consumer.StopProcessingAsync();
     }
 }

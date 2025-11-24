@@ -1,7 +1,17 @@
 using OrderSystem.Worker;
+using OrderSystem.Worker.Infrastructure;
+using Serilog;
 
-var builder = Host.CreateApplicationBuilder(args);
-builder.Services.AddHostedService<Worker>();
+var host = Host.CreateDefaultBuilder(args)
+    .UseSerilog((context, services, configuration) => configuration
+        .ReadFrom.Configuration(context.Configuration)
+        .Enrich.FromLogContext()
+        .WriteTo.Console())
+    .ConfigureServices((hostContext, services) =>
+    {
+        services.AddSingleton<OrderCreatedConsumer>();
+        services.AddHostedService<Worker>();
+    })
+    .Build();
 
-var host = builder.Build();
-host.Run();
+await host.RunAsync();

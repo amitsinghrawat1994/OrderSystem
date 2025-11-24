@@ -1,0 +1,49 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "API: OrderSystem",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build-api",
+            "program": "${workspaceFolder}/src/OrderSystem.Api/bin/Debug/net10.0/OrderSystem.Api.dll",
+            "args": [],
+            "cwd": "${workspaceFolder}/src/OrderSystem.Api",
+            "stopAtEntry": false,
+            "serverReadyAction": {
+                "action": "openExternally",
+                "pattern": "\\bNow listening on:\\s+(https?://\\S+)"
+            },
+            "env": {
+                "ASPNETCORE_ENVIRONMENT": "Development"
+            },
+            "sourceFileMap": {
+                "/Views": "${workspaceFolder}/Views"
+            }
+        },
+        {
+            "name": "Worker: OrderSystem",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build-worker",
+            "program": "${workspaceFolder}/src/OrderSystem.Worker/bin/Debug/net10.0/OrderSystem.Worker.dll",
+            "args": [],
+            "cwd": "${workspaceFolder}/src/OrderSystem.Worker",
+            "console": "integratedTerminal",
+            "stopAtEntry": false,
+            "env": {
+                "DOTNET_ENVIRONMENT": "Development"
+            }
+        }
+    ],
+    "compounds": [
+        {
+            "name": "DEBUG ALL (Api + Worker)",
+            "configurations": [
+                "API: OrderSystem",
+                "Worker: OrderSystem"
+            ],
+            "stopAll": true
+        }
+    ]
+}
