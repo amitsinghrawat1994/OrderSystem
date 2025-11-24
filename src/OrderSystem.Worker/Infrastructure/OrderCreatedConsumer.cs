@@ -12,10 +12,15 @@ public class OrderCreatedConsumer : IAsyncDisposable
 {
     private readonly ServiceBusProcessor _processor;
     private readonly ILogger<OrderCreatedConsumer> _logger;
+    private readonly IIdempotencyService _idempotencyService;
 
-    public OrderCreatedConsumer(IConfiguration configuration, ILogger<OrderCreatedConsumer> logger)
+    public OrderCreatedConsumer(IConfiguration configuration,
+        ILogger<OrderCreatedConsumer> logger,
+        IIdempotencyService idempotencyService)
     {
         _logger = logger;
+        _idempotencyService = idempotencyService;
+
         var connectionString = configuration.GetConnectionString("ServiceBus");
         var topicName = "orders-topic";
         var subscriptionName = "inventory-sub"; // Ensure this exists in Azure
@@ -45,10 +50,25 @@ public class OrderCreatedConsumer : IAsyncDisposable
         await _processor.StopProcessingAsync();
     }
 
+    // public async Task StartProcessingAsync() => await _processor.StartProcessingAsync();
+    // public async Task StopProcessingAsync() => await _processor.StopProcessingAsync();
+
     private async Task MessageHandler(ProcessMessageEventArgs args)
     {
+        string messageId = args.Message.MessageId;
+
         try
         {
+            // --- 1. IDEMPOTENCY CHECK ---
+            if (await _idempotencyService.IsMessageProcessedAsync(messageId))
+            {
+                _logger.LogWarning("Duplicate Message detected: {MessageId}. Skipping processing.", messageId);
+
+                // IMPORTANT: We must still "Complete" the message to remove it from the Service Bus.
+                await args.CompleteMessageAsync(args.Message);
+                return;
+            }
+
             string body = args.Message.Body.ToString();
             _logger.LogInformation("Received Message: {MessageId}. Correlation: {CorrelationId}", args.Message.MessageId, args.Message.CorrelationId);
 
@@ -62,7 +82,12 @@ public class OrderCreatedConsumer : IAsyncDisposable
                     orderEvent.OrderId, orderEvent.CustomerId);
 
                 await Task.Delay(100); // Simulating work
-                // ---------------------------
+
+                // --- MARK AS PROCESSED ---
+                // We mark it BEFORE completing the message. 
+                // Ideally, this operation and your DB transaction should be atomic (Outbox Pattern),
+                // but for this level, this is the standard robust approach.
+                await _idempotencyService.MarkMessageAsProcessedAsync(messageId);
 
                 // Complete the message (remove from Service Bus)
                 await args.CompleteMessageAsync(args.Message);

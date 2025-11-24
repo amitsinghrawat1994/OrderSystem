@@ -66,6 +66,7 @@ cd ../..
 
 
 
+docker-compose down
 docker-compose up -d
 
 https://localhost:7001/scalar/v1
