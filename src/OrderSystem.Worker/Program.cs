@@ -1,30 +1,40 @@
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using OrderSystem.Shared.Contracts;
 using OrderSystem.Worker;
 using OrderSystem.Worker.Infrastructure;
 using OrderSystem.Worker.Services;
 using Serilog;
-using Microsoft.Extensions.DependencyInjection;
 
-var host = Host.CreateDefaultBuilder(args)
-    .UseSerilog((context, services, configuration) => configuration
-        .ReadFrom.Configuration(context.Configuration)
-        .Enrich.FromLogContext()
-        .WriteTo.Console())
-    .ConfigureServices((hostContext, services) =>
-    {
-        // 1. Add Distributed Memory Cache (Stores data in RAM, looks like Redis)
-        services.AddDistributedMemoryCache();
+// 1. We switch from "Host.CreateDefaultBuilder" to "WebApplication.CreateBuilder" 
+// This allows the Worker to serve an HTTP Health Endpoint easily.
+var builder = WebApplication.CreateBuilder(args);
 
-        // 2. Register Idempotency Service
-        services.AddSingleton<IIdempotencyService, IdempotencyService>();
+// Configure Serilog
+Log.Logger = new LoggerConfiguration()
+    .ReadFrom.Configuration(builder.Configuration)
+    .Enrich.FromLogContext()
+    .WriteTo.Console()
+    .CreateLogger();
 
-        // 3. Register Consumer and Worker
-        services.AddSingleton<OrderCreatedConsumer>();
-        services.AddHostedService<Worker>();
+builder.Host.UseSerilog();
 
-        // The DLQ Doctor (New)
-        services.AddHostedService<DlqReplayWorker>();
-    })
-    .Build();
+// 2. Register Services
+builder.Services.AddDistributedMemoryCache();
+builder.Services.AddSingleton<IIdempotencyService, IdempotencyService>();
+builder.Services.AddSingleton<OrderCreatedConsumer>();
+builder.Services.AddHostedService<Worker>();
+// The DLQ Doctor (New)
+builder.Services.AddHostedService<DlqReplayWorker>();
 
-await host.RunAsync();
+// 3. Register Health Checks
+builder.Services.AddHealthChecks()
+    .AddCheck<ServiceBusHealthCheck>("service_bus_check");
+
+var app = builder.Build();
+
+// 4. Map the Health Endpoint
+app.MapHealthChecks("/health");
+
+// 5. Run the App
+await app.RunAsync();

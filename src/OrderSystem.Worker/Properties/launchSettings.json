@@ -4,6 +4,8 @@
     "OrderSystem.Worker": {
       "commandName": "Project",
       "dotnetRunMessages": true,
+      "launchBrowser": false,
+      "applicationUrl": "http://localhost:8001",
       "environmentVariables": {
         "DOTNET_ENVIRONMENT": "Development"
       }
