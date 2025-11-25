@@ -69,6 +69,12 @@ public class OutboxProcessor : BackgroundService
                     var eventData = JsonSerializer.Deserialize<OrderCreatedEvent>(message.Content);
                     if (eventData != null)
                     {
+                        // If the Total Amount is exactly 999, simulate a network crash.
+                        if (eventData.TotalAmount == 999)
+                        {
+                            throw new Exception("Simulated Azure Service Bus Timeout!");
+                        }
+
                         // 4. Publish to Azure Service Bus
                         await _messageBus.PublishAsync(eventData, "orders-topic", stoppingToken);
                     }

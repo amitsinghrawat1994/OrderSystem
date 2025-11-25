@@ -20,9 +20,11 @@ public class AppDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<OrderCreatedEvent>(b =>
-                {
-                    b.HasKey(o => o.OrderId);
-                });
+        {
+            b.HasKey(o => o.OrderId);
+            // Use explicit precision for decimal columns to avoid EF Core warnings
+            b.Property(o => o.TotalAmount).HasPrecision(18, 2);
+        });
 
         modelBuilder.Entity<OutboxMessage>(b =>
         {

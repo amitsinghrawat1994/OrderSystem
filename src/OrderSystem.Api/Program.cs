@@ -1,6 +1,7 @@
 using FluentValidation;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using OrderSystem.Api.Behaviors;
 using OrderSystem.Api.Features.Orders;
 using OrderSystem.Api.Infrastructure.BackgroundServices;
@@ -24,8 +25,9 @@ Log.Logger = new LoggerConfiguration()
 
 builder.Host.UseSerilog();
 
+// Configure EF Core to use SQL Server. The connection string is read from appsettings (DefaultConnection).
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseInMemoryDatabase("OrderSystemDb"));
+    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 builder.Services.AddHostedService<OutboxProcessor>();
 
 // 2. Add Services
@@ -43,6 +45,25 @@ builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationBeh
 builder.Services.AddSingleton<IMessageBus, AzureServiceBusPublisher>();
 
 var app = builder.Build();
+
+// Apply EF Core migrations at startup (if any). Ensure the Sql Server is available before calling Migrate.
+if (app.Environment.IsDevelopment())
+{
+    using (var scope = app.Services.CreateScope())
+    {
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        try
+        {
+            db.Database.Migrate();
+        }
+        catch (Exception ex)
+        {
+            var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+            logger.LogError(ex, "Failed to migrate database on startup.");
+            // Swallow exception in development so app can still start without crashing.
+        }
+    }
+}
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
