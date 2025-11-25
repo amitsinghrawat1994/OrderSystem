@@ -1,4 +1,6 @@
+using System.Text.Json;
 using MediatR;
+using OrderSystem.Api.Infrastructure.Persistence;
 using OrderSystem.Api.Infrastructure.ServiceBus;
 using OrderSystem.Shared.Contracts;
 
@@ -10,12 +12,14 @@ public record CreateOrderCommand(string CustomerId, decimal TotalAmount, List<st
 // Handler
 public class CreateOrderHandler : IRequestHandler<CreateOrderCommand, Guid>
 {
+    private readonly AppDbContext _dbContext;
     private readonly IMessageBus _messageBus;
     private readonly ILogger<CreateOrderHandler> _logger;
     private const string TopicName = "orders-topic"; // Ensure this exists in Azure
 
-    public CreateOrderHandler(IMessageBus messageBus, ILogger<CreateOrderHandler> logger)
+    public CreateOrderHandler(AppDbContext dbContext, IMessageBus messageBus, ILogger<CreateOrderHandler> logger)
     {
+        _dbContext = dbContext;
         _messageBus = messageBus;
         _logger = logger;
     }
@@ -34,8 +38,21 @@ public class CreateOrderHandler : IRequestHandler<CreateOrderCommand, Guid>
             CreatedAt: DateTime.UtcNow
         );
 
-        // 3. Publish to Azure Service Bus
-        await _messageBus.PublishAsync(integrationEvent, TopicName, cancellationToken);
+        var outboxMessage = new OutboxMessage
+        {
+            Id = Guid.NewGuid(),
+            OccurredOnUtc = DateTime.UtcNow,
+            Type = typeof(OrderCreatedEvent).Name,
+            Content = JsonSerializer.Serialize(integrationEvent)
+        };
+
+        _dbContext.Orders.Add(integrationEvent);
+        _dbContext.OutboxMessages.Add(outboxMessage);
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        // // 3. Publish to Azure Service Bus
+        // await _messageBus.PublishAsync(integrationEvent, TopicName, cancellationToken);
 
         return orderId;
     }

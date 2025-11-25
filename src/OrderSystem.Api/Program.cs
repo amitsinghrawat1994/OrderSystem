@@ -1,7 +1,10 @@
 using FluentValidation;
 using MediatR;
+using Microsoft.EntityFrameworkCore;
 using OrderSystem.Api.Behaviors;
 using OrderSystem.Api.Features.Orders;
+using OrderSystem.Api.Infrastructure.BackgroundServices;
+using OrderSystem.Api.Infrastructure.Persistence;
 using OrderSystem.Api.Infrastructure.ServiceBus;
 using Scalar.AspNetCore;
 using Serilog;
@@ -20,6 +23,10 @@ Log.Logger = new LoggerConfiguration()
     .CreateLogger();
 
 builder.Host.UseSerilog();
+
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseInMemoryDatabase("OrderSystemDb"));
+builder.Services.AddHostedService<OutboxProcessor>();
 
 // 2. Add Services
 builder.Services.AddControllers();
