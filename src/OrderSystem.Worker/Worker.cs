@@ -1,6 +1,3 @@
-using System.Threading;
-using System.Threading.Tasks;
-using Microsoft.Extensions.Hosting;
 using OrderSystem.Worker.Infrastructure;
 
 namespace OrderSystem.Worker;

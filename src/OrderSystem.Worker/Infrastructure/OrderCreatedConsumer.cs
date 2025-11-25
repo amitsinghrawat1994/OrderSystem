@@ -1,9 +1,5 @@
-using System;
 using System.Text.Json;
-using System.Threading.Tasks;
 using Azure.Messaging.ServiceBus;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging;
 using OrderSystem.Shared.Contracts;
 
 namespace OrderSystem.Worker.Infrastructure;

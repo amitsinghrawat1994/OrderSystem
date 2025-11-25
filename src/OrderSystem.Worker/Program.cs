@@ -1,5 +1,6 @@
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 using OrderSystem.Shared.Contracts;
 using OrderSystem.Worker;
 using OrderSystem.Worker.Infrastructure;
@@ -18,6 +19,25 @@ Log.Logger = new LoggerConfiguration()
     .CreateLogger();
 
 builder.Host.UseSerilog();
+
+builder.Services.AddOpenTelemetry()
+    .ConfigureResource(resource => resource.AddService("order-system-worker"))
+    .WithTracing(tracing =>
+    {
+        tracing
+            // We don't use AspNetCoreInstrumentation here because it's a worker
+            .AddHttpClientInstrumentation()
+            // 👇 CRITICAL: This links the Consumer trace to the Producer trace
+            .AddSource("Azure.Messaging.ServiceBus")
+            .AddOtlpExporter();
+    })
+    .WithMetrics(metrics =>
+    {
+        metrics
+            .AddHttpClientInstrumentation()
+            .AddRuntimeInstrumentation()
+            .AddOtlpExporter();
+    });
 
 // 2. Register Services
 builder.Services.AddDistributedMemoryCache();

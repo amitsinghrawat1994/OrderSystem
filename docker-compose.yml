@@ -1,7 +1,10 @@
 version: '3.8'
 
 services:
-  # 1. The Database Backend (Required by the Emulator)
+  # ---------------------------
+  # 1. INFRASTRUCTURE
+  # ---------------------------
+    # 1. The Database Backend (Required by the Emulator)
   emulator-db:
     image: mcr.microsoft.com/azure-sql-edge:latest
     container_name: servicebus-db
@@ -31,5 +34,56 @@ services:
       - MSSQL_SA_PASSWORD=StrongPassword123!
       - ACCEPT_EULA=Y
     volumes:
-      # Mount the config file we created in Step A
+       # Mount the config file we created in Step A
       - ./Config.json:/ServiceBus_Emulator/ConfigFiles/Config.json
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 5672 || exit 1"]
+      interval: 5s
+      retries: 20
+      start_period: 5s
+
+  # ---------------------------
+  # 3. OBSERVABILITY
+  # ---------------------------
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: jaeger
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true # Enable the modern OTLP standard
+    ports:
+      - "16686:16686" # The UI (http://localhost:16686)
+      - "4317:4317"   # OTLP gRPC Receiver (Standard for .NET)
+      - "4318:4318"   # OTLP HTTP Receiver
+  
+  # ---------------------------
+  # 2. APPLICATIONS
+  # ---------------------------
+  # orders-api:
+  #   image: orders-api
+  #   build:
+  #     context: ../src
+  #     dockerfile: OrderSystem.Api/Dockerfile
+  #   ports:
+  #     - "7001:8081" # Map Host 7001 -> Container HTTPS
+  #   environment:
+  #     - ASPNETCORE_URLS=https://+:8081;http://+:8080
+  #     - ASPNETCORE_ENVIRONMENT=Development
+  #     - ConnectionStrings__ServiceBus=Endpoint=sb://servicebus-emulator;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;
+  #   depends_on:
+  #     servicebus-emulator:
+  #       condition: service_healthy
+
+  # orders-worker:
+  #   image: orders-worker
+  #   build:
+  #     context: ../src
+  #     dockerfile: OrderSystem.Worker/Dockerfile
+  #   ports:
+  #     - "8001:8080" # Map Host 8001 -> Container HTTP (Health Check)
+  #   environment:
+  #     - ASPNETCORE_URLS=http://+:8080
+  #     - DOTNET_ENVIRONMENT=Development
+  #     - ConnectionStrings__ServiceBus=Endpoint=sb://servicebus-emulator;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;
+  #   depends_on:
+  #     servicebus-emulator:
+  #       condition: service_healthy

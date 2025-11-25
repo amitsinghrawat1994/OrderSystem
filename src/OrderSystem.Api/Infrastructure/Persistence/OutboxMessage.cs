@@ -1,5 +1,3 @@
-using System;
-
 namespace OrderSystem.Api.Infrastructure.Persistence;
 
 public class OutboxMessage

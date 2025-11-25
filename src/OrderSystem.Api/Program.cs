@@ -1,7 +1,9 @@
 using FluentValidation;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 using OrderSystem.Api.Behaviors;
 using OrderSystem.Api.Features.Orders;
 using OrderSystem.Api.Infrastructure.BackgroundServices;
@@ -24,6 +26,26 @@ Log.Logger = new LoggerConfiguration()
     .CreateLogger();
 
 builder.Host.UseSerilog();
+
+builder.Services.AddOpenTelemetry()
+    .ConfigureResource(resource => resource.AddService("order-system-api"))
+    .WithTracing(tracing =>
+    {
+        tracing
+            .AddAspNetCoreInstrumentation()
+            .AddHttpClientInstrumentation()
+            // 👇 CRITICAL: Enable Azure Service Bus Tracing
+            .AddSource("Azure.Messaging.ServiceBus")
+            .AddOtlpExporter(); // Sends to Jaeger (via Env Var OTEL_EXPORTER_OTLP_ENDPOINT)
+    })
+    .WithMetrics(metrics =>
+    {
+        metrics
+            .AddAspNetCoreInstrumentation()
+            .AddHttpClientInstrumentation()
+            .AddRuntimeInstrumentation()
+            .AddOtlpExporter();
+    });
 
 // Configure EF Core to use SQL Server. The connection string is read from appsettings (DefaultConnection).
 builder.Services.AddDbContext<AppDbContext>(options =>

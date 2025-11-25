@@ -1,5 +1,3 @@
-using System;
-
 namespace OrderSystem.Api.Infrastructure.ServiceBus;
 
 public interface IMessageBus

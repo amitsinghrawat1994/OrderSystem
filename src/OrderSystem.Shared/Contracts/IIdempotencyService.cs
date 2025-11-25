@@ -1,5 +1,3 @@
-using System;
-
 namespace OrderSystem.Shared.Contracts;
 
 public interface IIdempotencyService

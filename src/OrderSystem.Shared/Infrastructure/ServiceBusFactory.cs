@@ -1,5 +1,4 @@
 using Azure.Messaging.ServiceBus;
-using System;
 
 namespace OrderSystem.Shared.Infrastructure;
 
