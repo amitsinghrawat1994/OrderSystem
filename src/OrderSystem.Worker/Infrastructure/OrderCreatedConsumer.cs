@@ -70,6 +70,14 @@ public class OrderCreatedConsumer : IAsyncDisposable
             }
 
             string body = args.Message.Body.ToString();
+
+            // Inside MessageHandler
+            // Temporary: Force failure
+            if (body.Contains("fail-me"))
+            {
+                throw new Exception("Simulated Crash!");
+            }
+
             _logger.LogInformation("Received Message: {MessageId}. Correlation: {CorrelationId}", args.Message.MessageId, args.Message.CorrelationId);
 
             // Deserialize

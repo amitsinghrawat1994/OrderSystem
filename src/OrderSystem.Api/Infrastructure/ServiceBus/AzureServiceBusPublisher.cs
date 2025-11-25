@@ -53,7 +53,8 @@ public class AzureServiceBusPublisher : IMessageBus, IAsyncDisposable
             string jsonMessage = JsonSerializer.Serialize(message);
             var busMessage = new ServiceBusMessage(jsonMessage)
             {
-                MessageId = Guid.NewGuid().ToString(),
+                MessageId = Guid.NewGuid().ToString(), // Optionally set a unique MessageId
+                // MessageId = "FORCE-DUPLICATE", // For testing idempotency
                 CorrelationId = Guid.NewGuid().ToString(), // In real apps, grab this from HttpContext
                 Subject = typeof(T).Name
             };

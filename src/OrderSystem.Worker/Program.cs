@@ -21,6 +21,9 @@ var host = Host.CreateDefaultBuilder(args)
         // 3. Register Consumer and Worker
         services.AddSingleton<OrderCreatedConsumer>();
         services.AddHostedService<Worker>();
+
+        // The DLQ Doctor (New)
+        services.AddHostedService<DlqReplayWorker>();
     })
     .Build();
 
