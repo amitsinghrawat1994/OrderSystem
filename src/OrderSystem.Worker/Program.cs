@@ -1,3 +1,4 @@
+using OpenTelemetry.Exporter;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
@@ -14,14 +15,26 @@ var builder = WebApplication.CreateBuilder(args);
 // Configure Serilog
 Log.Logger = new LoggerConfiguration()
     .ReadFrom.Configuration(builder.Configuration)
-    .Enrich.FromLogContext()
-    .WriteTo.Console()
     .CreateLogger();
 
 builder.Host.UseSerilog();
 
+// Read OTLP configuration from environment variables or fallback defaults.
+// Best practice: set OTEL_EXPORTER_OTLP_ENDPOINT and optional OTEL_EXPORTER_OTLP_PROTOCOL
+var otlpEndpoint = Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT") ?? "http://localhost:4317";
+var otlpProtocol = Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_PROTOCOL") ?? "grpc";
+var otlpApiKey = Environment.GetEnvironmentVariable("OTEL_API_KEY") ?? Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_API_KEY");
+
+// Resource info: create a single, consistent Resource with service.name, service.version and service.instance.id
+var resourceBuilder = ResourceBuilder.CreateDefault()
+    .AddService(serviceName: "order-system-worker", serviceVersion: "1.0.0")
+    .AddAttributes(new System.Collections.Generic.KeyValuePair<string, object>[]
+    {
+        new System.Collections.Generic.KeyValuePair<string, object>("service.instance.id", "order-system-worker-instance")
+    });
+
 builder.Services.AddOpenTelemetry()
-    .ConfigureResource(resource => resource.AddService("order-system-worker"))
+    .ConfigureResource(resource => resource.AddAttributes(resourceBuilder.Build().Attributes))
     .WithTracing(tracing =>
     {
         tracing
@@ -29,14 +42,38 @@ builder.Services.AddOpenTelemetry()
             .AddHttpClientInstrumentation()
             // 👇 CRITICAL: This links the Consumer trace to the Producer trace
             .AddSource("Azure.Messaging.ServiceBus")
-            .AddOtlpExporter();
+            .AddOtlpExporter(otlpOptions =>
+            {
+                otlpOptions.Endpoint = new Uri(otlpEndpoint);
+                otlpOptions.Protocol = otlpProtocol.Equals("http/protobuf", StringComparison.OrdinalIgnoreCase)
+                    ? OtlpExportProtocol.HttpProtobuf
+                    : OtlpExportProtocol.Grpc;
+
+                if (!string.IsNullOrWhiteSpace(otlpApiKey))
+                {
+                    // attach custom header expected by Aspire
+                    otlpOptions.Headers = $"x-otlp-api-key={otlpApiKey}";
+                }
+
+                // Timeout and batch settings for resilience & perf
+                otlpOptions.TimeoutMilliseconds = 10000; // 10s
+            });
     })
     .WithMetrics(metrics =>
     {
         metrics
+            .AddMeter("order-system-worker-metrics")
             .AddHttpClientInstrumentation()
             .AddRuntimeInstrumentation()
-            .AddOtlpExporter();
+            .AddOtlpExporter(otlpOptions =>
+            {
+                otlpOptions.Endpoint = new Uri(otlpEndpoint);
+                otlpOptions.Protocol = otlpProtocol.Equals("http/protobuf", StringComparison.OrdinalIgnoreCase)
+                    ? OtlpExportProtocol.HttpProtobuf
+                    : OtlpExportProtocol.Grpc;
+                if (!string.IsNullOrWhiteSpace(otlpApiKey))
+                    otlpOptions.Headers = $"x-otlp-api-key={otlpApiKey}";
+            });
     });
 
 // 2. Register Services

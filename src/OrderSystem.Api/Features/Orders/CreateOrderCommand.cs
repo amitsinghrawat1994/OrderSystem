@@ -28,7 +28,7 @@ public class CreateOrderHandler : IRequestHandler<CreateOrderCommand, Guid>
     {
         // 1. Simulate Database Logic
         var orderId = Guid.NewGuid();
-        _logger.LogInformation("Order {OrderId} created in database for Customer {CustomerId}", orderId, request.CustomerId);
+        _logger.LogInformation($"Order {orderId} created in database for Customer {request.CustomerId}");
 
         // 2. Map to Event
         var integrationEvent = new OrderCreatedEvent(

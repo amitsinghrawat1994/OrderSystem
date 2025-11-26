@@ -45,15 +45,15 @@ services:
   # ---------------------------
   # 3. OBSERVABILITY
   # ---------------------------
-  jaeger:
-    image: jaegertracing/all-in-one:latest
-    container_name: jaeger
-    environment:
-      - COLLECTOR_OTLP_ENABLED=true # Enable the modern OTLP standard
+  aspire-dashboard:
+    image: mcr.microsoft.com/dotnet/aspire-dashboard:latest
+    container_name: aspire-dashboard
+    # environment:
+    #   - DOTNET_DASHBOARD_UNSECURED_ALLOW_ANONYMOUS=true # Allow access without token
+    #   - DOTNET_DASHBOARD_OTLP_AUTH_MODE=Unsecured
     ports:
-      - "16686:16686" # The UI (http://localhost:16686)
-      - "4317:4317"   # OTLP gRPC Receiver (Standard for .NET)
-      - "4318:4318"   # OTLP HTTP Receiver
+      - "18888:18888" # UI
+      - "4317:18889"   # gRPC
   
   # ---------------------------
   # 2. APPLICATIONS
@@ -61,17 +61,21 @@ services:
   # orders-api:
   #   image: orders-api
   #   build:
-  #     context: ../src
-  #     dockerfile: OrderSystem.Api/Dockerfile
+  #     context: .
+  #     dockerfile: src/OrderSystem.Api/Dockerfile
   #   ports:
   #     - "7001:8081" # Map Host 7001 -> Container HTTPS
   #   environment:
   #     - ASPNETCORE_URLS=https://+:8081;http://+:8080
   #     - ASPNETCORE_ENVIRONMENT=Development
   #     - ConnectionStrings__ServiceBus=Endpoint=sb://servicebus-emulator;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;
+  #     - OTEL_EXPORTER_OTLP_ENDPOINT=http://aspire-dashboard:18889
+  #     - OTEL_EXPORTER_OTLP_PROTOCOL=grpc
   #   depends_on:
   #     servicebus-emulator:
   #       condition: service_healthy
+  #     aspire-dashboard:
+  #       condition: service_started
 
   # orders-worker:
   #   image: orders-worker
