@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using OrderSystem.Api.Infrastructure.Persistence;
 using OrderSystem.Api.Infrastructure.ServiceBus;
 using OrderSystem.Shared.Contracts;
@@ -11,15 +12,25 @@ public class OutboxProcessor : BackgroundService
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<OutboxProcessor> _logger;
     private readonly IMessageBus _messageBus;
+    private readonly IConfiguration _configuration;
+    private readonly bool _simulateServiceBusTimeout;
+    private readonly int _maxPublishAttempts;
+    private readonly int _publishRetryDelayMs;
 
     public OutboxProcessor(
         IServiceScopeFactory scopeFactory,
         ILogger<OutboxProcessor> logger,
-        IMessageBus messageBus)
+        IMessageBus messageBus,
+        IConfiguration configuration)
     {
         _scopeFactory = scopeFactory;
         _logger = logger;
         _messageBus = messageBus;
+        _configuration = configuration;
+
+        _simulateServiceBusTimeout = _configuration.GetValue<bool>("Outbox:SimulateServiceBusTimeout", false);
+        _maxPublishAttempts = _configuration.GetValue<int>("Outbox:MaxPublishAttempts", 3);
+        _publishRetryDelayMs = _configuration.GetValue<int>("Outbox:PublishRetryDelayMs", 200);
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -70,13 +81,41 @@ public class OutboxProcessor : BackgroundService
                     if (eventData != null)
                     {
                         // If the Total Amount is exactly 999, simulate a network crash.
-                        if (eventData.TotalAmount == 999)
+                        if (eventData.TotalAmount == 999 && _simulateServiceBusTimeout)
                         {
+                            // Simulate a transient network time out / Service Bus failure used for local testing
                             throw new Exception("Simulated Azure Service Bus Timeout!");
                         }
 
-                        // 4. Publish to Azure Service Bus
-                        await _messageBus.PublishAsync(eventData, "orders-topic", stoppingToken);
+                        // 4. Publish to Azure Service Bus with a small retry loop for transient errors
+                        var attempt = 0;
+                        var published = false;
+                        Exception? lastEx = null;
+
+                        while (!published && attempt < _maxPublishAttempts)
+                        {
+                            attempt++;
+                            try
+                            {
+                                await _messageBus.PublishAsync(eventData, "orders-topic", stoppingToken);
+                                published = true;
+                            }
+                            catch (Exception ex)
+                            {
+                                lastEx = ex;
+                                _logger.LogWarning(ex, "Attempt {Attempt} failed publishing message {MessageId}", attempt, message.Id);
+                                if (attempt < _maxPublishAttempts)
+                                {
+                                    var delay = _publishRetryDelayMs * Math.Pow(2, attempt - 1);
+                                    await Task.Delay(TimeSpan.FromMilliseconds(delay), stoppingToken);
+                                }
+                            }
+                        }
+
+                        if (!published && lastEx is not null)
+                        {
+                            throw lastEx; // handled in outer catch for this message
+                        }
                     }
                 }
 
